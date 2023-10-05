@@ -3,8 +3,8 @@ atmosphere-grid:
   number-of-layers: 100
   
 planet:
-  planet-mass: 5.333730e+28 # grams
-  planet-radius: 1.508481e+09 # cm
+  planet-mass: 5.153981e+28 # grams
+  planet-radius: 1.664684e+09 # cm
   number-of-zenith-angles: 4
   surface-albedo: 0.06 # Following Hu et al. (2021)
   photon-scale-factor: 1.0
