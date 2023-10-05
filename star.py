@@ -53,13 +53,6 @@ def main():
     print('Bolometric flux at planet = %.1f W/m^2'%(stellar_constant))
     print('Equilibrium temperature = %.1f K'%(T_eq))
 
-    # wv_hu = wv_new.copy()
-    # F_hu = F_new.copy()
-    # stellar_constant_hu = stellar_radiation(wv_hu, F_hu)
-    # factor = (0.7*k218b_stellar_constant)/stellar_constant_hu
-    # F_hu = F_hu*factor
-    # print(factor)
-
     # Plot
     plt.rcParams.update({'font.size': 15})
     fig,ax = plt.subplots(1,1,figsize=[6,5])
