@@ -3,7 +3,7 @@ class Star:
     Teff : float # K
     metal : float # log10(M/H)
     kmag : float
-    logg : float
+    logg : float # log10 cgs units
     planets : dict # dictionary of planet objects
 
     def __init__(self, radius, Teff, metal, kmag, logg, planets):
@@ -15,8 +15,8 @@ class Star:
         self.planets = planets
         
 class Planet:
-    radius : float # in Jupiter radii
-    mass : float # in Jupiter masses
+    radius : float # in Earth radii
+    mass : float # in Earth masses
     Teq : float # Equilibrium T in K
     transit_duration : float # in seconds
     a: float # semi-major axis in AU
@@ -31,17 +31,17 @@ class Planet:
         self.stellar_constant = stellar_constant
 
 k2_18b = Planet(
-    radius=0.211, # Exo.Mast
-    mass=0.0281, # Exo.Mast
+    radius=2.610, # Benneke et al. (2019)
+    mass=8.63, # Cloutier et al. (2019)
     Teq=278.7, # Matches stellar constant
     transit_duration=2.682*60*60, # Exo.Mast
-    a=0.143, # Exo.Mast
+    a=0.15910, # Benneke et al. (2019)
     stellar_constant=1368.0 # Benneke et al. (2019)
 )
 
 k2_18 = Star(
-    radius=0.41, # Exo.Mast
-    Teff=3457.0, # Exo.Mast
+    radius=0.4445, # Benneke et al. (2019)
+    Teff=3457, # Benneke et al. (2017)
     metal=0.12, # Exo.Mast
     kmag=8.9, # Exo.Mast
     logg=4.79, # Exo.Mast
