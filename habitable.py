@@ -74,7 +74,7 @@ def couple2photochem(c, settings_in, settings_out, atmosphere_out, eddy, extra_b
     make_settings(settings_in, settings_out, settings)
 
 def make_picaso_input_habitable(outfile):
-    pc = Atmosphere('zahnle_earth_new.yaml',\
+    pc = Atmosphere('input/zahnle_earth_new.yaml',\
                 outfile+'_settings.yaml',\
                 "input/k2_18b_stellar_flux.txt",\
                 outfile+'_atmosphere_c.txt')
@@ -114,7 +114,7 @@ def climate_and_photochem(settings_in, outfile, eddy, extra_bcs,
     couple2photochem(c, settings_in, settings_out, atmosphere_out, eddy, extra_bcs)
 
     # Initialize photochemical model
-    pc = Atmosphere('zahnle_earth_new.yaml',\
+    pc = Atmosphere('input/zahnle_earth_new.yaml',\
                     settings_out,\
                     "input/k2_18b_stellar_flux.txt",\
                     atmosphere_out)

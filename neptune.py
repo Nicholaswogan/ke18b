@@ -249,11 +249,11 @@ def write_photochem_settings_file(settings_in, settings_out, surf, min_mix, sp_t
         yaml.dump(out, f, Dumper=MyDumper ,sort_keys=False, width=70)
 
 def make_picaso_input_neptune(outfile):
-    pc1 = Atmosphere('zahnle_earth_new_noparticles.yaml',\
+    pc1 = Atmosphere('input/zahnle_earth_new_noparticles.yaml',\
                     outfile+'_settings_quench.yaml',\
                     "input/k2_18b_stellar_flux.txt",\
                     outfile+'_atmosphere_quench_c.txt')
-    pc2 = Atmosphere('zahnle_earth_new_noparticles.yaml',\
+    pc2 = Atmosphere('input/zahnle_earth_new_noparticles.yaml',\
                     outfile+'_settings_photochem.yaml',\
                     "input/k2_18b_stellar_flux.txt",\
                     outfile+'_atmosphere_photochem_c.txt')
@@ -286,7 +286,7 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
     P, T = P_T_from_file(PTfile_in, P_bottom, P_top)
     write_quench_files(settings_quench_in, settings_quench_out, atmosphere_quench_out, P, T, M_H_metalicity, CtoO, ct_file, atoms, min_mix, nz_q, eddy_q)
 
-    pc_q = Atmosphere('zahnle_earth_new_noparticles.yaml',\
+    pc_q = Atmosphere('input/zahnle_earth_new_noparticles.yaml',\
                     settings_quench_out,\
                     "input/k2_18b_stellar_flux.txt",\
                     atmosphere_quench_out)
@@ -310,7 +310,7 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
     eddy_ = np.ones(c.z.shape[0])*eddy_p
     c.out2atmosphere_txt(atmosphere_photochem_out, eddy_, overwrite=True)
 
-    pc = Atmosphere('zahnle_earth_new_noparticles.yaml',\
+    pc = Atmosphere('input/zahnle_earth_new_noparticles.yaml',\
                     settings_photochem_out,\
                     "input/k2_18b_stellar_flux.txt",\
                     atmosphere_photochem_out)
@@ -338,7 +338,7 @@ def default_params():
     params['P_top'] = 1.0e6
     params['M_H_metalicity'] = np.log10(100)
     params['CtoO'] = 1.0
-    params['ct_file'] = 'zahnle_earth_new_ct.yaml'
+    params['ct_file'] = 'input/zahnle_earth_new_ct.yaml'
     params['atoms'] = ['H','He','C','O','N']
     params['min_mix'] = 1.0e-8 # quench
     params['nz_q'] = 20
