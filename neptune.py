@@ -247,6 +247,31 @@ def write_photochem_settings_file(settings_in, settings_out, surf, min_mix, sp_t
     out = FormatSettings_main(settings)
     with open(settings_out,'w') as f:
         yaml.dump(out, f, Dumper=MyDumper ,sort_keys=False, width=70)
+
+def make_picaso_input_neptune(outfile):
+    pc1 = Atmosphere('zahnle_earth_new_noparticles.yaml',\
+                    outfile+'_settings_quench.yaml',\
+                    "input/k2_18b_stellar_flux.txt",\
+                    outfile+'_atmosphere_quench_c.txt')
+    pc2 = Atmosphere('zahnle_earth_new_noparticles.yaml',\
+                    outfile+'_settings_photochem.yaml',\
+                    "input/k2_18b_stellar_flux.txt",\
+                    outfile+'_atmosphere_photochem_c.txt')
+    
+    mix = {}
+    mix['press'] = np.append(pc1.wrk.pressure,pc2.wrk.pressure)
+    mix['temp'] = np.append(pc1.var.temperature,pc2.var.temperature)
+    for i,sp in enumerate(pc1.dat.species_names[pc1.dat.np:-2]):
+        ind = pc1.dat.species_names.index(sp)
+        tmp1 = pc1.wrk.densities[ind,:]/pc1.wrk.density
+
+        ind = pc2.dat.species_names.index(sp)
+        tmp2 = pc2.wrk.densities[ind,:]/pc2.wrk.density
+        
+        mix[sp] = np.append(tmp1,tmp2)
+
+    species = pc1.dat.species_names[pc1.dat.np:-2]
+    utils.write_picaso_atmosphere(mix, outfile+'_picaso.pt', species)
     
 
 def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile_in, outfile, P_bottom, P_top, M_H_metalicity, 
@@ -300,6 +325,8 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
     atmosphere_out_c = outfile+"_atmosphere_photochem_c.txt"
     pc.out2atmosphere_txt(atmosphere_out_c,overwrite=True)
 
+    # write picaso file
+    make_picaso_input_neptune(outfile)
 
 def default_params():
     params = {}

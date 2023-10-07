@@ -90,3 +90,14 @@ def write_picaso_atmosphere(mix, outfile, species):
             for j,sp in enumerate(species):
                 f.write(fmt.format('%e'%(mix[sp][P.shape[0]-i-1])))
             f.write('\n')
+
+def residuals(data_y, err, expected_y):
+    return (data_y - expected_y)/err
+
+def chi_squared(data_y, err, expected_y):
+    R = residuals(data_y, err, expected_y)
+    return np.sum(R**2)
+
+def reduced_chi_squared(data_y, err, expected_y, dof):
+    chi2 = chi_squared(data_y, err, expected_y)
+    return chi2/dof

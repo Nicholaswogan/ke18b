@@ -4,6 +4,7 @@ from photochem.clima import AdiabatClimate
 from photochem import Atmosphere
 from photochem.utils._format import FormatSettings_main, MyDumper, Loader, yaml
 from pathos.multiprocessing import ProcessingPool as Pool
+import utils
 
 def eddy_profile_like_Earth(log10P, log10P_trop):
     """Generates an eddy diffusion profile like Earth's
@@ -72,6 +73,21 @@ def couple2photochem(c, settings_in, settings_out, atmosphere_out, eddy, extra_b
 
     make_settings(settings_in, settings_out, settings)
 
+def make_picaso_input_habitable(outfile):
+    pc = Atmosphere('zahnle_earth_new.yaml',\
+                outfile+'_settings.yaml',\
+                "input/k2_18b_stellar_flux.txt",\
+                outfile+'_atmosphere_c.txt')
+    mix = {}
+    mix['press'] = pc.wrk.pressure
+    mix['temp'] = pc.var.temperature
+    for i,sp in enumerate(pc.dat.species_names[pc.dat.np:-2]):
+        ind = pc.dat.species_names.index(sp)
+        tmp = pc.wrk.densities[ind,:]/pc.wrk.density
+        mix[sp] = tmp
+    species = pc.dat.species_names[pc.dat.np:-2]
+    utils.write_picaso_atmosphere(mix, outfile+'_picaso.pt', species)
+
 def climate_and_photochem(settings_in, outfile, eddy, extra_bcs,
                           mix, P_surf, T_trop, T_guess):
     settings_out = outfile+"_settings.yaml"
@@ -114,6 +130,9 @@ def climate_and_photochem(settings_in, outfile, eddy, extra_bcs,
     # Write output file
     atmosphere_out_c = outfile+"_atmosphere_c.txt"
     pc.out2atmosphere_txt(atmosphere_out_c, overwrite=True)
+
+    # Write picaso file
+    make_picaso_input_habitable(outfile)
 
 def default_params():
     params = {}
