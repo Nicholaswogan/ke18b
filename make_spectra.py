@@ -1,6 +1,3 @@
-import habitable
-import neptune
-from photochem import Atmosphere
 import utils
 import numpy as np
 from picaso import justdoit as jdi
