@@ -27,7 +27,7 @@ planet:
     rainfall-rate: 1.0
     tropopause-altitude: 2.22056939197779144e+007
     water-condensation: true
-    condensation-rate: {A: 1.0e-8, rhc: 1, rh0: 1.05}
+    condensation-rate: {A: 1.0e-5, rhc: 1, rh0: 1.05}
 
 particles:
 - name: H2SO4aer
