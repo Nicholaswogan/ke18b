@@ -9,7 +9,7 @@ import planets
 import pickle
 import yaml
 
-def compute_spectra(add_water_cloud, outfile):
+def compute_spectra(add_water_cloud, add_haze, outfile):
     filename_db = os.path.join(os.getenv('picaso_refdata'), 'opacities','opacities.db')
     opa = jdi.opannection(wave_range=[.01,100],filename_db=filename_db)
     case1 = jdi.inputs()
@@ -49,6 +49,9 @@ def compute_spectra(add_water_cloud, outfile):
             p_coud_top = np.log10(settings['clouds']['P-trop']/1e6)
             cloud_thickness = p_cloud_base - p_coud_top
             case1.clouds(g0=[0.9], w0=[0.9], opd=[10], p=[p_cloud_base], dp=[cloud_thickness])
+
+        if add_haze:
+            case1.clouds(filename=model_folders[i]+model_names[i]+'_haze.txt', delim_whitespace=True)
 
         df = case1.spectrum(opa, full_output=True,calculation='transmission')
         wno_h, rprs2_h  = df['wavenumber'] , df['transit_depth']
@@ -140,15 +143,24 @@ def compute_statistics(infile, out_stats_file):
 
 if __name__ == '__main__':
     add_water_cloud = False
+    add_haze = False
     outfile = 'results/spectra/spectra.pkl'
     out_stats_file = 'results/spectra/spectra_stats.pkl'
-    compute_spectra(add_water_cloud, outfile)
+    compute_spectra(add_water_cloud, add_haze, outfile)
     compute_statistics(outfile, out_stats_file)
 
     add_water_cloud = True
+    add_haze = False
     outfile = 'results/spectra/spectra_watercloud.pkl'
     out_stats_file = 'results/spectra/spectra_watercloud_stats.pkl'
-    compute_spectra(add_water_cloud, outfile)
+    compute_spectra(add_water_cloud, add_haze, outfile)
+    compute_statistics(outfile, out_stats_file)
+
+    add_water_cloud = False
+    add_haze = True
+    outfile = 'results/spectra/spectra_haze.pkl'
+    out_stats_file = 'results/spectra/spectra_haze_stats.pkl'
+    compute_spectra(add_water_cloud, add_haze, outfile)
     compute_statistics(outfile, out_stats_file)
     
 

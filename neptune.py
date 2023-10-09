@@ -269,7 +269,7 @@ def make_picaso_input_neptune(outfile):
                     outfile+'_settings_quench.yaml',\
                     "input/k2_18b_stellar_flux.txt",\
                     outfile+'_atmosphere_quench_c.txt')
-    pc2 = Atmosphere('input/zahnle_earth_new_noparticles.yaml',\
+    pc2 = Atmosphere('input/zahnle_earth_new.yaml',\
                     outfile+'_settings_photochem.yaml',\
                     "input/k2_18b_stellar_flux.txt",\
                     outfile+'_atmosphere_photochem_c.txt')
@@ -292,7 +292,7 @@ def make_picaso_input_neptune(outfile):
 
 def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile_in, outfile, P_bottom, P_top, M_H_metalicity, 
                                CtoO, ct_file, atoms, min_mix, nz_q, eddy_q,
-                               T_trop, P_top_clima, eddy_p):
+                               T_trop, P_top_clima, eddy_p, equilibrium_time):
                                
     settings_quench_out = outfile+"_settings_quench.yaml"
     settings_photochem_out = outfile+"_settings_photochem.yaml"
@@ -326,11 +326,11 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
     eddy_ = np.ones(c.z.shape[0])*eddy_p
     c.out2atmosphere_txt(atmosphere_photochem_out, eddy_, overwrite=True)
 
-    pc = Atmosphere('input/zahnle_earth_new_noparticles.yaml',\
+    pc = Atmosphere('input/zahnle_earth_new.yaml',\
                     settings_photochem_out,\
                     "input/k2_18b_stellar_flux.txt",\
                     atmosphere_photochem_out)
-    
+    pc.var.equilibrium_time = equilibrium_time
     pc.var.atol = 1e-25
     pc.var.rtol = 1e-3
     pc.initialize_stepper(pc.wrk.usol)
@@ -343,6 +343,23 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
 
     # write picaso file
     make_picaso_input_neptune(outfile)
+
+    # Haze column density (particles/cm^2)
+    ind = pc.dat.species_names.index('HCaer1')
+    haze_density = pc.wrk.densities[ind,:]
+    ind = pc.dat.species_names.index('HCaer2')
+    haze_density += pc.wrk.densities[ind,:]
+    ind = pc.dat.species_names.index('HCaer3')
+    haze_density += pc.wrk.densities[ind,:]
+    dz = pc.var.z[1] - pc.var.z[0]
+    haze_column = haze_density*dz
+    pressure = pc.wrk.pressure
+    # Append values for lower atmosphere
+    pressure = np.append(pc_q.wrk.pressure,pressure)
+    haze_column = np.append(np.zeros(pc_q.wrk.pressure.shape[0]),haze_column)
+    # write file
+    haze_file = outfile+'_haze.txt'
+    utils.make_haze_opacity_file(pressure[:-1], haze_column[:-1], haze_file)
 
 def default_params():
     params = {}
@@ -362,11 +379,13 @@ def default_params():
     params['T_trop'] = 215
     params['P_top_clima'] = 5.0e-4
     params['eddy_p'] = 5.0e5
+    params['equilibrium_time'] = 1e17
     return params
 
 def nominal():
     params = default_params()
     params['outfile'] = 'results/neptune/nominal'
+    params['equilibrium_time'] = 2e13
     return params
 
 if __name__ == '__main__':

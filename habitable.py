@@ -138,6 +138,19 @@ def climate_and_photochem(settings_in, outfile, eddy, extra_bcs,
 
     # Write picaso file
     make_picaso_input_habitable(outfile)
+    
+    # haze column density (particles/cm^2)
+    ind = pc.dat.species_names.index('HCaer1')
+    haze_density = pc.wrk.densities[ind,:]
+    ind = pc.dat.species_names.index('HCaer2')
+    haze_density += pc.wrk.densities[ind,:]
+    ind = pc.dat.species_names.index('HCaer3')
+    haze_density += pc.wrk.densities[ind,:]
+    dz = pc.var.z[1] - pc.var.z[0]
+    haze_column = haze_density*dz
+    pressure = pc.wrk.pressure
+    haze_file = outfile+'_haze.txt'
+    utils.make_haze_opacity_file(pressure[:-1], haze_column[:-1], haze_file)
 
 def default_params():
     params = {}

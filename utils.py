@@ -1,8 +1,6 @@
 import numpy as np
 from scipy import constants as const
-import cantera as ct
-from scipy import integrate
-from photochem.utils._format import FormatSettings_main, MyDumper, Loader, yaml
+import miepython
 
 def composition_from_metalicity(M_H_metalicity):
 
@@ -101,3 +99,82 @@ def chi_squared(data_y, err, expected_y):
 def reduced_chi_squared(data_y, err, expected_y, dof):
     chi2 = chi_squared(data_y, err, expected_y)
     return chi2/dof
+
+def make_haze_opacity_file(pressure, haze_column, outfile):
+
+    particle_radius_um = 0.1 # microns
+    particle_radius_cm = particle_radius_um*(1/1e6)*(1e2/1) # cm 
+    
+    fil = open('data/khare_tholins.dat')
+    lines = fil.readlines()
+    fil.close()
+    
+    wavelength = [] # microns
+    m_real = []
+    m_imag = []
+    for line in lines[13:]:
+        tmp = line.split()
+        wavelength.append(float(tmp[1]))
+        m_real.append(float(tmp[2]))
+        m_imag.append(float(tmp[3]))
+        
+    wavelength = np.array(wavelength) # this is micro meter
+    m_real = np.array(m_real)
+    m_imag = np.array(m_imag)
+    
+    radius = particle_radius_um
+    x = 2 * np.pi * radius / wavelength
+    m = m_real - 1j*m_imag
+    qext, qsca, qback, g = miepython.mie(m, x)
+    w0 = qsca/qext
+    
+    keys = ['pressure','wavenumber','opd','w0','g0']
+    out = {}
+    for key in keys:
+        out[key] = []
+
+    for j in range(haze_column.shape[0]):
+        for i in range(qext.shape[0]):
+            taup_1 = qext[i]*particle_radius_cm**2*haze_column[j]
+    
+            out['pressure'].append(pressure[j]/1e6)
+            out['wavenumber'].append(1e4/wavelength[i])
+            out['opd'].append(taup_1)
+            out['w0'].append(w0[i])
+            out['g0'].append(g[i])
+
+    fmt = '{:20}'
+    with open(outfile,'w') as f:
+        for key in out:
+            f.write(fmt.format(key))
+        f.write('\n')
+        for i in range(len(out['pressure'])):
+            for key in out:
+                f.write(fmt.format('%e'%(out[key][i])))
+            f.write('\n')
+
+def haze_production_rate(pc):
+    res = {}
+    
+    pl = pc.production_and_loss('HCaer1',pc.wrk.usol)
+    ind = pl.production_rx.index('C2H + C4H2 => HCaer1 + H')
+    res['HCaer1_prod'] = pl.integrated_production[ind]
+    
+    pl = pc.production_and_loss('HCaer2',pc.wrk.usol)
+    ind = pl.production_rx.index('H2CN + HCN => HCaer2')
+    res['HCaer2_prod'] = pl.integrated_production[ind]
+    
+    pl = pc.production_and_loss('HCaer3',pc.wrk.usol)
+    ind = pl.production_rx.index('C4H + HCCCN => HCaer3')
+    res['HCaer3_prod'] = pl.integrated_production[ind]
+
+    # molecules/cm^2/s * mol/molecules * g/mol = g/cm^2/s
+    haze_prod = 0.0
+    ind = pc.dat.species_names.index('HCaer1')
+    haze_prod += (res['HCaer1_prod']/const.Avogadro)*pc.dat.species_mass[ind] 
+    ind = pc.dat.species_names.index('HCaer2')
+    haze_prod += (res['HCaer2_prod']/const.Avogadro)*pc.dat.species_mass[ind] 
+    ind = pc.dat.species_names.index('HCaer3')
+    haze_prod += (res['HCaer3_prod']/const.Avogadro)*pc.dat.species_mass[ind] 
+    res['haze_prod'] = haze_prod
+    return res
