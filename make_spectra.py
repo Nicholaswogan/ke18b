@@ -7,8 +7,9 @@ from scipy.stats import norm
 import os
 import planets
 import pickle
+import yaml
 
-def compute_spectra():
+def compute_spectra(add_water_cloud, outfile):
     filename_db = os.path.join(os.getenv('picaso_refdata'), 'opacities','opacities.db')
     opa = jdi.opannection(wave_range=[.01,100],filename_db=filename_db)
     case1 = jdi.inputs()
@@ -19,18 +20,36 @@ def compute_spectra():
             radius_unit = jdi.u.Unit('R_sun'),database='phoenix')
     case1.approx(p_reference=1.0)
 
-    model_names = ['noCH4','withCH4','withCH4_vdepCO','nominal','case1']
-    atmosphere_files = [
-        'results/habitable/noCH4_picaso.pt',
-        'results/habitable/withCH4_picaso.pt',
-        'results/habitable/withCH4_vdepCO_picaso.pt',
-        'results/neptune/nominal_picaso.pt',
-        'results/neptune/case1_picaso.pt'
+    model_type = ['habitable','habitable','habitable','neptune']
+    model_names = ['noCH4','withCH4','withCH4_vdepCO','nominal']
+    model_folders = [
+        'results/habitable/',
+        'results/habitable/',
+        'results/habitable/',
+        'results/neptune/'
     ]
+
     species_to_exclude = [['H2O'],['NH3'],['CO2'],['CH4'],['CO'],['HCN'],['H2O','NH3'],['H2O','NH3','CO']]
     res = {}
-    for i,atmosphere_file in enumerate(atmosphere_files):
+    for i in range(len(model_folders)):
+        atmosphere_file = model_folders[i]+model_names[i]+'_picaso.pt'
         case1.atmosphere(filename = atmosphere_file, delim_whitespace=True)
+
+        if add_water_cloud:
+            # Get cloud region from settings file
+            if model_type[i] == 'habitable':
+                settings_file = model_folders[i]+model_names[i]+'_settings.yaml'
+            else:
+                settings_file = model_folders[i]+model_names[i]+'_settings_photochem.yaml'
+            with open(settings_file,'r') as f:
+                settings = yaml.load(f,Loader=yaml.Loader)
+
+            # Add the cloud
+            p_cloud_base = np.log10(settings['clouds']['P-condense']/1e6)
+            p_coud_top = np.log10(settings['clouds']['P-trop']/1e6)
+            cloud_thickness = p_cloud_base - p_coud_top
+            case1.clouds(g0=[0.9], w0=[0.9], opd=[10], p=[p_cloud_base], dp=[cloud_thickness])
+
         df = case1.spectrum(opa, full_output=True,calculation='transmission')
         wno_h, rprs2_h  = df['wavenumber'] , df['transit_depth']
         entry = {}
@@ -48,20 +67,20 @@ def compute_spectra():
 
         res[model_names[i]] = entry
 
-    with open('results/spectra/spectra.pkl','wb') as f:
+    with open(outfile,'wb') as f:
         pickle.dump(res,f)
 
 def stats_objective(x, data_y, err, expected_y):
     return utils.chi_squared(data_y, err, expected_y+x[0])
 
-def compute_statistics():
+def compute_statistics(infile, out_stats_file):
 
     i_values = [0,6]
 
     with open('data/data_fig.pkl','rb') as f:
         data = pickle.load(f)
 
-    with open('results/spectra/spectra.pkl','rb') as f:
+    with open(infile,'rb') as f:
         models = pickle.load(f)
 
     models_binned = {}
@@ -116,12 +135,21 @@ def compute_statistics():
 
         models_binned[i] = models_r
 
-    with open('results/spectra/spectra_binned.pkl','wb') as f:
+    with open(out_stats_file,'wb') as f:
         pickle.dump(models_binned,f)
 
 if __name__ == '__main__':
-    compute_spectra()
-    compute_statistics()
+    add_water_cloud = False
+    outfile = 'results/spectra/spectra.pkl'
+    out_stats_file = 'results/spectra/spectra_stats.pkl'
+    compute_spectra(add_water_cloud, outfile)
+    compute_statistics(outfile, out_stats_file)
+
+    add_water_cloud = True
+    outfile = 'results/spectra/spectra_watercloud.pkl'
+    out_stats_file = 'results/spectra/spectra_watercloud_stats.pkl'
+    compute_spectra(add_water_cloud, outfile)
+    compute_statistics(outfile, out_stats_file)
     
 
 

@@ -369,12 +369,5 @@ def nominal():
     params['outfile'] = 'results/neptune/nominal'
     return params
 
-def case1():
-    params = default_params()
-    params['outfile'] = 'results/neptune/case1'
-    params['M_H_metalicity'] = np.log10(150)
-    params['CtoO'] = 0.5
-    return params
-
 if __name__ == '__main__':
-    run_quench_photochem_model(**nominal())
+    run_quench_photochem_model(**case1())
