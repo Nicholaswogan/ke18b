@@ -229,9 +229,21 @@ def make_clima_profile_from_quench(c, pc, T_trop, P_top):
     T_surf = pc.var.temperature[-1]
     c.make_profile_bg_gas(T_surf, P_i, P_surf, bg_gas)
 
-    return surf
+    # Find pressure where H2O condenses
+    ind = c.species_names.index('H2O')
+    assert c.f_i[0,ind] == c.f_i[1,ind]
 
-def write_photochem_settings_file(settings_in, settings_out, surf, min_mix, sp_to_exclude, top, P_surf):
+    for i in range(c.f_i[:,ind].shape[0]):
+        if c.f_i[i,ind] < c.f_i[0,ind]:
+            ind1 = i
+            P_condense = c.P[ind1]
+            break
+
+    P_trop = c.P_trop
+
+    return surf, P_condense, P_trop
+
+def write_photochem_settings_file(settings_in, settings_out, surf, min_mix, sp_to_exclude, top, P_surf, P_condense, P_trop):
 
     fil = open(settings_in,'r')
     settings = yaml.load(fil,Loader=Loader)
@@ -245,6 +257,10 @@ def write_photochem_settings_file(settings_in, settings_out, surf, min_mix, sp_t
     settings['boundary-conditions'] = bc['boundary-conditions']
 
     out = FormatSettings_main(settings)
+    # tack on some info about clouds
+    out['clouds'] = {}
+    out['clouds']['P-condense'] = float(P_condense)
+    out['clouds']['P-trop'] = float(P_trop)
     with open(settings_out,'w') as f:
         yaml.dump(out, f, Dumper=MyDumper ,sort_keys=False, width=70)
 
@@ -300,12 +316,12 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
                        'input/neptune/settings_quench_climate.yaml',
                        'input/k2_18b_stellar_flux.txt')
     
-    surf = make_clima_profile_from_quench(c, pc_q, T_trop, P_top_clima)
+    surf, P_condense, P_trop = make_clima_profile_from_quench(c, pc_q, T_trop, P_top_clima)
 
     settings_in = 'input/neptune/settings_neptune_photochem_template.yaml'
     min_mix_photochem = 1e-20
     sp_to_exclude = ['H2']
-    write_photochem_settings_file(settings_photochem_in, settings_photochem_out, surf, min_mix_photochem, sp_to_exclude, c.z[-1], c.P_surf)
+    write_photochem_settings_file(settings_photochem_in, settings_photochem_out, surf, min_mix_photochem, sp_to_exclude, c.z[-1], c.P_surf, P_condense, P_trop)
 
     eddy_ = np.ones(c.z.shape[0])*eddy_p
     c.out2atmosphere_txt(atmosphere_photochem_out, eddy_, overwrite=True)
@@ -361,4 +377,4 @@ def case1():
     return params
 
 if __name__ == '__main__':
-    run_quench_photochem_model(**case1())
+    run_quench_photochem_model(**nominal())

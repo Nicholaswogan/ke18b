@@ -44,6 +44,9 @@ def make_settings(settings_in, settings_out, settings_dict):
         data['boundary-conditions'].append(bc)
 
     data = FormatSettings_main(data)
+    data['clouds'] = {}
+    data['clouds']['P-condense'] = settings_dict['P-condense']
+    data['clouds']['P-trop'] = settings_dict['P-trop']
     
     fil = open(settings_out,'w')
     yaml.dump(data,fil,Dumper=MyDumper,sort_keys=False,width=70)
@@ -70,6 +73,8 @@ def couple2photochem(c, settings_in, settings_out, atmosphere_out, eddy, extra_b
     settings['surface-pressure'] = float(c.P_surf/1e6)
     settings['tropopause-altitude'] = float(trop_alt)
     settings['boundary-conditions'] = extra_bcs
+    settings['P-condense'] = c.P_surf
+    settings['P-trop'] = c.P_trop
 
     make_settings(settings_in, settings_out, settings)
 
