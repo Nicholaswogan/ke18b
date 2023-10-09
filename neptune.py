@@ -370,4 +370,4 @@ def nominal():
     return params
 
 if __name__ == '__main__':
-    run_quench_photochem_model(**case1())
+    run_quench_photochem_model(**nominal())
