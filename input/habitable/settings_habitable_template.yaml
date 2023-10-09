@@ -57,7 +57,7 @@ boundary-conditions:
 - name: N2D
   type: short lived
 - name: CO2
-  lower-boundary: {type: mix, mix: 0.01}
+  lower-boundary: {type: mix, mix: 0.008}
   upper-boundary: {type: veff, veff: 0.0}
 - name: N2
   lower-boundary: {type: mix, mix: 0.01}

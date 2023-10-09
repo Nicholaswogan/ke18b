@@ -4,11 +4,13 @@ from picaso import justdoit as jdi
 from scipy.stats import distributions
 from scipy import optimize
 from scipy.stats import norm
+import os
 import planets
 import pickle
 
 def compute_spectra():
-    opa = jdi.opannection(wave_range=[.01,100])
+    filename_db = os.path.join(os.getenv('picaso_refdata'), 'opacities','opacities.db')
+    opa = jdi.opannection(wave_range=[.01,100],filename_db=filename_db)
     case1 = jdi.inputs()
     case1.phase_angle(0)
     case1.gravity(mass=planets.k2_18b.mass, mass_unit=jdi.u.Unit('M_earth'),
@@ -25,7 +27,7 @@ def compute_spectra():
         'results/neptune/nominal_picaso.pt',
         'results/neptune/case1_picaso.pt'
     ]
-    species_to_exclude = [['H2O'],['NH3'],['CO2'],['CH4'],['CO'],['H2O','NH3']]
+    species_to_exclude = [['H2O'],['NH3'],['CO2'],['CH4'],['CO'],['HCN'],['H2O','NH3'],['H2O','NH3','CO']]
     res = {}
     for i,atmosphere_file in enumerate(atmosphere_files):
         case1.atmosphere(filename = atmosphere_file, delim_whitespace=True)
@@ -89,16 +91,36 @@ def compute_statistics():
                 models_r[model][case]['p'] = p
                 models_r[model][case]['sig'] = sig
 
+        model = 'flat'
+        case = 'all'
+        models_r[model] = {}
+        rprs2[:] = 0.002944
+        models_r[model][case] = {}
+        models_r[model][case]['wno'] = wno
+        models_r[model][case]['rprs2'] = rprs2
+
+        init = np.array([1e-5])
+        args = (data['all']['rprs2'][i:], data['all']['err'][i:], rprs2[::-1][i:])
+        sol = optimize.minimize(stats_objective, init, method = 'Nelder-Mead', args = args)
+        assert sol.success
+        models_r[model][case]['offset'] = sol.x[0]
+
+        dof = data['all']['wv'][i:].shape[0]
+        chi2 = utils.chi_squared(data['all']['rprs2'][i:], data['all']['err'][i:], rprs2[::-1][i:]+sol.x[0])
+        rchi2 = chi2/dof
+        p = distributions.chi2.sf(chi2, dof)
+        sig = norm.ppf(1 - p)
+        models_r[model][case]['rchi2'] = rchi2
+        models_r[model][case]['p'] = p
+        models_r[model][case]['sig'] = sig
+
         models_binned[i] = models_r
 
     with open('results/spectra/spectra_binned.pkl','wb') as f:
         pickle.dump(models_binned,f)
 
-def main():
-    compute_spectra()
-    compute_statistics()
-
 if __name__ == '__main__':
+    compute_spectra()
     compute_statistics()
     
 

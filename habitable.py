@@ -140,7 +140,7 @@ def default_params():
     params['outfile'] = None
     params['eddy'] = 5.0e5
     params['extra_bcs'] = []
-    params['mix'] = {'H2O': 200.0, 'CO2': 1.0e-2, 'N2': 1.0e-2, 
+    params['mix'] = {'H2O': 200.0, 'CO2': 0.008, 'N2': 1.0e-2, 
                      'H2': 1.0, 'CH4': 1.0e-10, 'CO': 1.0e-10}
     params['P_surf'] = 1.0e6
     params['T_trop'] = 215.0
@@ -155,11 +155,11 @@ def noCH4():
 def withCH4():
     params = default_params()
     params['outfile'] = 'results/habitable/withCH4'
-    params['mix']['CH4'] = 1.0e-2
+    params['mix']['CH4'] = 2.0e-2
 
     bc = {}
     bc['name'] = 'CH4'
-    bc['lower-boundary'] = {'type': 'mix', 'mix': 1.0e-2}
+    bc['lower-boundary'] = {'type': 'mix', 'mix': 2.0e-2}
     bc['upper-boundary'] = {'type': 'veff', 'veff': 0.0}
     params['extra_bcs'].append(bc)
     return params
@@ -167,11 +167,11 @@ def withCH4():
 def withCH4_vdepCO():
     params = default_params()
     params['outfile'] = 'results/habitable/withCH4_vdepCO'
-    params['mix']['CH4'] = 1.0e-2
+    params['mix']['CH4'] = 2.0e-2
 
     bc = {}
     bc['name'] = 'CH4'
-    bc['lower-boundary'] = {'type': 'mix', 'mix': 1.0e-2}
+    bc['lower-boundary'] = {'type': 'mix', 'mix': 2.0e-2}
     bc['upper-boundary'] = {'type': 'veff', 'veff': 0.0}
     params['extra_bcs'].append(bc)
 
