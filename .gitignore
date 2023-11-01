@@ -11,6 +11,7 @@ a.out
 test.run
 *.dSYM
 .vscode
+*.ipynb
 
 
 src/Stringifor

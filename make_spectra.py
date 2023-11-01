@@ -57,16 +57,16 @@ def compute_spectra(add_water_cloud, add_haze, outfile):
         wno_h, rprs2_h  = df['wavenumber'] , df['transit_depth']
         entry = {}
         entry['all'] = {}
-        entry['all']['wno'] = wno_h
-        entry['all']['rprs2'] = rprs2_h
+        entry['all']['wv'] = 1e4/wno_h[::-1].copy()
+        entry['all']['rprs2'] = rprs2_h[::-1].copy()
         for sp in species_to_exclude:
             case1.atmosphere(filename = atmosphere_file,exclude_mol=sp, delim_whitespace=True)
             df = case1.spectrum(opa, full_output=True,calculation='transmission')
             wno_h, rprs2_h  = df['wavenumber'] , df['transit_depth']
             key = '_'.join(sp)
             entry[key] = {}
-            entry[key]['wno'] = wno_h
-            entry[key]['rprs2'] = rprs2_h
+            entry[key]['wv'] = 1e4/wno_h[::-1].copy()
+            entry[key]['rprs2'] = rprs2_h[::-1].copy()
 
         res[model_names[i]] = entry
 
@@ -80,7 +80,7 @@ def compute_statistics(infile, out_stats_file):
 
     i_values = [0,6]
 
-    with open('data/data_fig.pkl','rb') as f:
+    with open('data/osfstorage-archive/lowres.pkl','rb') as f:
         data = pickle.load(f)
 
     with open(infile,'rb') as f:
@@ -93,19 +93,24 @@ def compute_statistics(infile, out_stats_file):
         for model in models:
             models_r[model] = {}
             for case in models[model]:
-                wno, rprs2 = jdi.mean_regrid(models[model][case]['wno'], models[model][case]['rprs2'], newx=1e4/data['all']['wv'][::-1])
-                models_r[model][case] = {}
-                models_r[model][case]['wno'] = wno
-                models_r[model][case]['rprs2'] = rprs2
+                
+                # regrid spectrum to data
+                _, _, rprs2 = utils.rebin_picaso_to_data(models[model][case]['wv'], models[model][case]['rprs2'], data['all']['wv_bins'])
 
+                # Save results
+                models_r[model][case] = {}
+                models_r[model][case]['wv'] = data['all']['wv']
+                models_r[model][case]['rprs2'] = rprs2
+                
+                # Find offset
                 init = np.array([1e-5])
-                args = (data['all']['rprs2'][i:], data['all']['err'][i:], rprs2[::-1][i:])
+                args = (data['all']['rprs2'][i:], data['all']['rprs2_err'][i:], rprs2[i:])
                 sol = optimize.minimize(stats_objective, init, method = 'Nelder-Mead', args = args)
                 assert sol.success
                 models_r[model][case]['offset'] = sol.x[0]
 
                 dof = data['all']['wv'][i:].shape[0]
-                chi2 = utils.chi_squared(data['all']['rprs2'][i:], data['all']['err'][i:], rprs2[::-1][i:]+sol.x[0])
+                chi2 = utils.chi_squared(data['all']['rprs2'][i:], data['all']['rprs2_err'][i:], rprs2[i:]+sol.x[0])
                 rchi2 = chi2/dof
                 p = distributions.chi2.sf(chi2, dof)
                 sig = norm.ppf(1 - p)
@@ -118,17 +123,17 @@ def compute_statistics(infile, out_stats_file):
         models_r[model] = {}
         rprs2[:] = 0.002944
         models_r[model][case] = {}
-        models_r[model][case]['wno'] = wno
+        models_r[model][case]['wv'] = data['all']['wv']
         models_r[model][case]['rprs2'] = rprs2
 
         init = np.array([1e-5])
-        args = (data['all']['rprs2'][i:], data['all']['err'][i:], rprs2[::-1][i:])
+        args = (data['all']['rprs2'][i:], data['all']['rprs2_err'][i:], rprs2[i:])
         sol = optimize.minimize(stats_objective, init, method = 'Nelder-Mead', args = args)
         assert sol.success
         models_r[model][case]['offset'] = sol.x[0]
 
         dof = data['all']['wv'][i:].shape[0]
-        chi2 = utils.chi_squared(data['all']['rprs2'][i:], data['all']['err'][i:], rprs2[::-1][i:]+sol.x[0])
+        chi2 = utils.chi_squared(data['all']['rprs2'][i:], data['all']['rprs2_err'][i:], rprs2[i:]+sol.x[0])
         rchi2 = chi2/dof
         p = distributions.chi2.sf(chi2, dof)
         sig = norm.ppf(1 - p)

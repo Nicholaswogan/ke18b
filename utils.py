@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import constants as const
 import miepython
+from photochem.clima import rebin
 
 def composition_from_metalicity(M_H_metalicity):
 
@@ -99,6 +100,19 @@ def chi_squared(data_y, err, expected_y):
 def reduced_chi_squared(data_y, err, expected_y, dof):
     chi2 = chi_squared(data_y, err, expected_y)
     return chi2/dof
+
+def rebin_picaso_to_data(wv, flux, wv_bins_data):
+    "Rebins Picaso output to new wavelength bins."  
+    d = np.diff(wv)
+    wv_bins = np.array([wv[0]-d[0]/2] + list(wv[0:-1]+d/2.0) + [wv[-1]+d[-1]/2]).copy()
+    flux_vals = flux.copy()
+
+    assert wv_bins_data.shape[1] == 2
+
+    flux_vals_new = np.empty(wv_bins_data.shape[0])
+    for i in range(wv_bins_data.shape[0]):
+        flux_vals_new[i] = rebin(wv_bins, flux_vals, wv_bins_data[i,:].copy())[0]
+    return wv_bins, flux_vals, flux_vals_new
 
 def make_haze_opacity_file(pressure, haze_column, outfile):
 
