@@ -76,6 +76,11 @@ def compute_spectra(add_water_cloud, add_haze, outfile):
 def stats_objective(x, data_y, err, expected_y):
     return utils.chi_squared(data_y, err, expected_y+x[0])
 
+def stats_objective_1(x, i, data, rprs2_soss, rprs2_g395h):
+    tmp1 = utils.chi_squared(data['soss']['rprs2'][i:], data['soss']['rprs2_err'][i:], rprs2_soss[i:]+x[0])
+    tmp2 = utils.chi_squared(data['g395h']['rprs2'][:], data['g395h']['rprs2_err'][:], rprs2_g395h[:]+x[1])
+    return tmp1 + tmp2
+
 def compute_statistics(infile, out_stats_file):
 
     i_values = [0,6]
@@ -109,6 +114,7 @@ def compute_statistics(infile, out_stats_file):
                 assert sol.success
                 models_r[model][case]['offset'] = sol.x[0]
 
+                # stats
                 dof = data['all']['wv'][i:].shape[0]
                 chi2 = utils.chi_squared(data['all']['rprs2'][i:], data['all']['rprs2_err'][i:], rprs2[i:]+sol.x[0])
                 rchi2 = chi2/dof
@@ -117,6 +123,33 @@ def compute_statistics(infile, out_stats_file):
                 models_r[model][case]['rchi2'] = rchi2
                 models_r[model][case]['p'] = p
                 models_r[model][case]['sig'] = sig
+
+                # Find split offset
+                _, _, rprs2_soss = utils.rebin_picaso_to_data(models[model][case]['wv'], models[model][case]['rprs2'], data['soss']['wv_bins'])
+                _, _, rprs2_g395h = utils.rebin_picaso_to_data(models[model][case]['wv'], models[model][case]['rprs2'], data['g395h']['wv_bins'])
+
+                init = np.array([1e-5,1e-5])
+                args = (i,data,rprs2_soss,rprs2_g395h)
+                sol = optimize.minimize(stats_objective_1, init, method = 'Nelder-Mead', args = args)
+                assert sol.success
+                models_r[model][case]['split'] = {}
+                models_r[model][case]['split']['wv_soss'] = data['soss']['wv']
+                models_r[model][case]['split']['rprs2_soss'] = rprs2_soss
+                models_r[model][case]['split']['wv_g395h'] = data['g395h']['wv']
+                models_r[model][case]['split']['rprs2_g395h'] = rprs2_g395h
+                models_r[model][case]['split']['offset_soss'] = sol.x[0]
+                models_r[model][case]['split']['offset_g395h'] = sol.x[1]
+
+                # stats
+                dof = data['all']['wv'][i:].shape[0]
+                chi2 = utils.chi_squared(data['soss']['rprs2'][i:], data['soss']['rprs2_err'][i:], rprs2_soss[i:]+sol.x[0]) \
+                     + utils.chi_squared(data['g395h']['rprs2'][:], data['g395h']['rprs2_err'][:], rprs2_g395h[:]+sol.x[1])
+                rchi2 = chi2/dof
+                p = distributions.chi2.sf(chi2, dof)
+                sig = norm.ppf(1 - p)
+                models_r[model][case]['split']['rchi2'] = rchi2
+                models_r[model][case]['split']['p'] = p
+                models_r[model][case]['split']['sig'] = sig
 
         model = 'flat'
         case = 'all'
@@ -140,6 +173,31 @@ def compute_statistics(infile, out_stats_file):
         models_r[model][case]['rchi2'] = rchi2
         models_r[model][case]['p'] = p
         models_r[model][case]['sig'] = sig
+
+        rprs2_soss[:] = 0.002944
+        rprs2_g395h[:] = 0.002944
+        init = np.array([1e-5,1e-5])
+        args = (i,data,rprs2_soss,rprs2_g395h)
+        sol = optimize.minimize(stats_objective_1, init, method = 'Nelder-Mead', args = args)
+        assert sol.success
+        models_r[model][case]['split'] = {}
+        models_r[model][case]['split']['wv_soss'] = data['soss']['wv']
+        models_r[model][case]['split']['rprs2_soss'] = rprs2_soss
+        models_r[model][case]['split']['wv_g395h'] = data['g395h']['wv']
+        models_r[model][case]['split']['rprs2_g395h'] = rprs2_g395h
+        models_r[model][case]['split']['offset_soss'] = sol.x[0]
+        models_r[model][case]['split']['offset_g395h'] = sol.x[1]
+
+        # stats
+        dof = data['all']['wv'][i:].shape[0]
+        chi2 = utils.chi_squared(data['soss']['rprs2'][i:], data['soss']['rprs2_err'][i:], rprs2_soss[i:]+sol.x[0]) \
+             + utils.chi_squared(data['g395h']['rprs2'][:], data['g395h']['rprs2_err'][:], rprs2_g395h[:]+sol.x[1])
+        rchi2 = chi2/dof
+        p = distributions.chi2.sf(chi2, dof)
+        sig = norm.ppf(1 - p)
+        models_r[model][case]['split']['rchi2'] = rchi2
+        models_r[model][case]['split']['p'] = p
+        models_r[model][case]['split']['sig'] = sig
 
         models_binned[i] = models_r
 
