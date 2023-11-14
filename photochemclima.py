@@ -114,18 +114,6 @@ class PhotochemClima():
 
     def photochemical_equilibrium(self):
         
-        self.pc.prep_atmosphere(self.pc.wrk.usol)
-
-        # Check if P-T profile is within tolerance
-        T_p = np.interp(np.log10(self.pc.wrk.pressure.copy()[::-1]), self.log10P_interp, self.T_interp)
-        T_p = T_p.copy()[::-1]
-        self.max_dT = np.max(np.abs(T_p - self.pc.var.temperature))
-        if self.max_dT > self.T_tol:
-            self.pc.set_press_temp_edd(self.P, self.T, self.edd, self.P_trop)
-        # Check if TOA pressure is within bounds
-        if self.pc.wrk.pressure[-1] < self.min_TOA_p or self.pc.wrk.pressure[-1] > self.max_TOA_p:
-            self.pc.update_vertical_grid(TOA_pressure=self.avg_TOA_p)
-
         self.pc.initialize_stepper(self.pc.wrk.usol)
         tn = 0.0
         nsteps_total = 0
