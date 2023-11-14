@@ -375,10 +375,10 @@ def default_params():
     params['atoms'] = ['H','He','C','O','N']
     params['min_mix'] = 1.0e-8 # quench
     params['nz_q'] = 20
-    params['eddy_q'] = 1.0e8
+    params['eddy_q'] = 1.0e8 # from Hu (2021), page 6.
     params['T_trop'] = 215
     params['P_top_clima'] = 5.0e-4
-    params['eddy_p'] = 5.0e5
+    params['eddy_p'] = 5.0e5 # choosen arbitrarily
     params['equilibrium_time'] = 1e17
     return params
 

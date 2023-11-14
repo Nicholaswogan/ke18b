@@ -192,3 +192,10 @@ def haze_production_rate(pc):
     haze_prod += (res['HCaer3_prod']/const.Avogadro)*pc.dat.species_mass[ind] 
     res['haze_prod'] = haze_prod
     return res
+
+def gravity(radius, mass, z):
+    "CGS units"
+    G_grav = const.G
+    grav = G_grav * (mass/1.0e3) / ((radius + z)/1.0e2)**2.0
+    grav = grav*1.0e2 # convert to cgs
+    return grav # cm/s^2

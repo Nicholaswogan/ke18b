@@ -8,6 +8,7 @@ import os
 import planets
 import pickle
 import yaml
+import pandas as pd
 
 def compute_spectra(add_water_cloud, add_haze, outfile):
     filename_db = os.path.join(os.getenv('picaso_refdata'), 'opacities','opacities.db')
@@ -52,6 +53,38 @@ def compute_spectra(add_water_cloud, add_haze, outfile):
 
         if add_haze:
             case1.clouds(filename=model_folders[i]+model_names[i]+'_haze.txt', delim_whitespace=True)
+
+        if add_haze and add_water_cloud:
+            df = pd.read_csv(model_folders[i]+model_names[i]+'_haze.txt', delim_whitespace=True)
+
+            # water properties
+            g0 = 0.9
+            w0 = 0.9
+            opd = 10
+
+            maxp = 10**p_cloud_base # max pressure is bottom of cloud deck
+            minp = 10**(p_cloud_base - cloud_thickness) # min pressure 
+
+            # Get haze properties where ther is a water cloud
+            g0_ = df.loc[((df['pressure'] >= minp) & (df['pressure'] <= maxp)),'g0']
+            w0_ = df.loc[((df['pressure'] >= minp) & (df['pressure'] <= maxp)),'w0']
+            opd_ = df.loc[((df['pressure'] >= minp) & (df['pressure'] <= maxp)),'opd']
+
+            # scattering optical depths
+            opd_sh = opd_*w0_ # haze
+            opd_sw = opd*w0  # water droplets
+
+            opd_t = opd_ + opd # total optical depth
+            # total single scattering albedo
+            w0_t = (opd_sh + opd_sw)/opd_t
+            # Asymetry paramter
+            g0_t = g0*(opd_sw)/(opd_sw+opd_sh) + g0_*(opd_sh)/(opd_sw+opd_sh)
+
+            df.loc[((df['pressure'] >= minp) & (df['pressure'] <= maxp)),'g0'] = g0_t
+            df.loc[((df['pressure'] >= minp) & (df['pressure'] <= maxp)),'w0'] = w0_t
+            df.loc[((df['pressure'] >= minp) & (df['pressure'] <= maxp)),'opd'] = opd_t
+
+            case1.clouds(df=df)
 
         df = case1.spectrum(opa, full_output=True,calculation='transmission')
         wno_h, rprs2_h  = df['wavenumber'] , df['transit_depth']
@@ -223,6 +256,13 @@ if __name__ == '__main__':
     add_haze = True
     outfile = 'results/spectra/spectra_haze.pkl'
     out_stats_file = 'results/spectra/spectra_haze_stats.pkl'
+    compute_spectra(add_water_cloud, add_haze, outfile)
+    compute_statistics(outfile, out_stats_file)
+
+    add_water_cloud = True
+    add_haze = True
+    outfile = 'results/spectra/spectra_haze_watercloud.pkl'
+    out_stats_file = 'results/spectra/spectra_haze_watercloud_stats.pkl'
     compute_spectra(add_water_cloud, add_haze, outfile)
     compute_statistics(outfile, out_stats_file)
     
