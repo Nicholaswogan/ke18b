@@ -306,7 +306,7 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
                     settings_quench_out,\
                     "input/k2_18b_stellar_flux.txt",\
                     atmosphere_quench_out)
-    
+    pc_q.var.custom_binary_diffusion_fcn = utils.custom_binary_diffusion_fcn
     integrate_quench_equilibrium(pc_q)
 
     atmosphere_out_c = outfile+"_atmosphere_quench_c.txt"
@@ -330,6 +330,7 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
                     settings_photochem_out,\
                     "input/k2_18b_stellar_flux.txt",\
                     atmosphere_photochem_out)
+    pc.var.custom_binary_diffusion_fcn = utils.custom_binary_diffusion_fcn
     pc.var.equilibrium_time = equilibrium_time
     pc.var.atol = 1e-25
     pc.var.rtol = 1e-3
@@ -388,5 +389,20 @@ def nominal():
     params['equilibrium_time'] = 2e13
     return params
 
+def nominal_S():
+    params = default_params()
+    params['outfile'] = 'results/neptune/nominal_S'
+    params['atoms'] = ['H','He','C','O','N','S']
+    params['equilibrium_time'] = 1.0e10
+    return params
+
+def TOI270d():
+    params = default_params()
+    params['outfile'] = 'results/neptune/TOI270d'
+    params['atoms'] = ['H','He','C','O','N']
+    params['T_trop'] = 270
+    params['equilibrium_time'] = 2e13
+    return params
+
 if __name__ == '__main__':
-    run_quench_photochem_model(**nominal())
+    run_quench_photochem_model(**TOI270d())

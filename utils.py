@@ -2,6 +2,59 @@ import numpy as np
 from scipy import constants as const
 import miepython
 from photochem.clima import rebin
+import numba as nb
+
+@nb.cfunc(nb.double(nb.double, nb.double, nb.double))
+def custom_binary_diffusion_fcn(mu_i, mubar, T):
+    # Equation 6 in Gladstone et al. (1996)
+    b = 3.64e-5*T**(1.75-1.0)*7.3439e21*np.sqrt(2.01594/mu_i)
+    return b
+
+def eddy_profile_like_Earth(log10P, log10P_trop):
+    """Generates an eddy diffusion profile like Earth's.
+    Pressures in log10 bars. Modeled off of Massie and Hunten (1981).
+    """
+    slope = (3.6 - 5.4)/(-1 - (-4))
+    eddy_upper = 5.6
+    eddy_trop = 5.0
+    eddy_cold_trap = 3.6
+
+    eddy = np.zeros(len(log10P))
+
+    inds = np.where(log10P > log10P_trop)
+    eddy[inds] = eddy_trop
+
+    ind = np.max(inds) + 1
+
+    x = log10P[ind]
+    y = eddy_cold_trap
+    b = y - slope*x
+
+    for i in range(ind,len(log10P)):
+        eddy[i] = slope*log10P[i] + b
+
+    eddy[eddy>eddy_upper] = eddy_upper
+
+    return 10.0**eddy
+
+def eddy_profile_like_Jupiter(log10P):
+    """Generates an eddy diffusion profile like Jupiter's.
+    Based on Moses et al. (2005), Figure 15.
+    Follows Gladstone et al. (1996).
+    """
+
+    slope = (4.6 - 8)/(-3 - (-10))
+    
+    eddy = np.zeros(log10P.shape[0])
+    ind = np.argmin(np.abs(log10P - (-1)))
+
+    intercept = 3.6 - slope*log10P[ind+1]
+
+    eddy[:ind+1] = 3
+    eddy[ind+1] = 3.6
+    eddy[ind+2:] = log10P[ind+2:]*slope + intercept
+
+    return 10.0**eddy
 
 def composition_from_metalicity(M_H_metalicity):
 

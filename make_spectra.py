@@ -9,9 +9,12 @@ import planets
 import pickle
 import yaml
 import pandas as pd
+import warnings
+warnings.filterwarnings('ignore')
 
 def compute_spectra(add_water_cloud, add_haze, outfile):
-    filename_db = os.path.join(os.getenv('picaso_refdata'), 'opacities','opacities.db')
+    filename_db = os.path.join(os.getenv('picaso_refdata'), 'opacities','all_opacities_0.6_6_R60000.db')
+    opa = jdi.opannection(filename_db=filename_db,wave_range=[1,6])
     opa = jdi.opannection(wave_range=[.01,100],filename_db=filename_db)
     case1 = jdi.inputs()
     case1.phase_angle(0)
@@ -21,16 +24,17 @@ def compute_spectra(add_water_cloud, add_haze, outfile):
             radius_unit = jdi.u.Unit('R_sun'),database='phoenix')
     case1.approx(p_reference=1.0)
 
-    model_type = ['habitable','habitable','habitable','neptune']
-    model_names = ['noCH4','withCH4','withCH4_vdepCO','nominal']
+    model_type = ['habitable','habitable','habitable','neptune','neptune']
+    model_names = ['model1a','model1b','model1c','nominal','nominal_S']
     model_folders = [
         'results/habitable/',
         'results/habitable/',
         'results/habitable/',
+        'results/neptune/',
         'results/neptune/'
     ]
 
-    species_to_exclude = [['H2O'],['NH3'],['CO2'],['CH4'],['CO'],['HCN'],['H2O','NH3'],['H2O','NH3','CO']]
+    species_to_exclude = [['H2O'],['NH3'],['CO2'],['CH4'],['CO'],['HCN'],['SO2'],['H2S']]
     res = {}
     for i in range(len(model_folders)):
         atmosphere_file = model_folders[i]+model_names[i]+'_picaso.pt'
@@ -40,10 +44,11 @@ def compute_spectra(add_water_cloud, add_haze, outfile):
             # Get cloud region from settings file
             if model_type[i] == 'habitable':
                 settings_file = model_folders[i]+model_names[i]+'_settings.yaml'
+                settings = {'clouds':{'P-condense':1e6, 'P-trop': 28021.17671039341}}
             else:
                 settings_file = model_folders[i]+model_names[i]+'_settings_photochem.yaml'
-            with open(settings_file,'r') as f:
-                settings = yaml.load(f,Loader=yaml.Loader)
+                with open(settings_file,'r') as f:
+                    settings = yaml.load(f,Loader=yaml.Loader)
 
             # Add the cloud
             p_cloud_base = np.log10(settings['clouds']['P-condense']/1e6)
@@ -242,20 +247,6 @@ if __name__ == '__main__':
     add_haze = False
     outfile = 'results/spectra/spectra.pkl'
     out_stats_file = 'results/spectra/spectra_stats.pkl'
-    compute_spectra(add_water_cloud, add_haze, outfile)
-    compute_statistics(outfile, out_stats_file)
-
-    add_water_cloud = True
-    add_haze = False
-    outfile = 'results/spectra/spectra_watercloud.pkl'
-    out_stats_file = 'results/spectra/spectra_watercloud_stats.pkl'
-    compute_spectra(add_water_cloud, add_haze, outfile)
-    compute_statistics(outfile, out_stats_file)
-
-    add_water_cloud = False
-    add_haze = True
-    outfile = 'results/spectra/spectra_haze.pkl'
-    out_stats_file = 'results/spectra/spectra_haze_stats.pkl'
     compute_spectra(add_water_cloud, add_haze, outfile)
     compute_statistics(outfile, out_stats_file)
 

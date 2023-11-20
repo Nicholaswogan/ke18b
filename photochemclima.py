@@ -1,13 +1,7 @@
 from photochem import Atmosphere, PhotoException
 from photochem.clima import AdiabatClimate
 import numpy as np
-import numba as nb
-
-@nb.cfunc(nb.double(nb.double, nb.double, nb.double))
-def custom_binary_diffusion_fcn(mu_i, mubar, T):
-    # Equation 6 in Gladstone et al. (1996)
-    b = 3.64e-5*T**(1.75-1.0)*7.3439e21*np.sqrt(2.01594/mu_i)
-    return b
+import utils
 
 class PhotochemClima():
 
@@ -15,7 +9,7 @@ class PhotochemClima():
                  clima_species_file, clima_settings_file, data_dir=None):
         
         self.pc = Atmosphere(species_file, settings_file, star_file, atmosphere_file, data_dir)
-        self.pc.var.custom_binary_diffusion_fcn = custom_binary_diffusion_fcn # set our special binary diffusion parameter
+        self.pc.var.custom_binary_diffusion_fcn = utils.custom_binary_diffusion_fcn # set our special binary diffusion parameter
         self.pc.var.atol = 1.0e-27
         self.pc.var.verbose = False
         self.c = AdiabatClimate(clima_species_file, clima_settings_file, star_file, data_dir)
