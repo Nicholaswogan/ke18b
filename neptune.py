@@ -396,13 +396,5 @@ def nominal_S():
     params['equilibrium_time'] = 1.0e10
     return params
 
-def TOI270d():
-    params = default_params()
-    params['outfile'] = 'results/neptune/TOI270d'
-    params['atoms'] = ['H','He','C','O','N']
-    params['T_trop'] = 270
-    params['equilibrium_time'] = 2e13
-    return params
-
 if __name__ == '__main__':
-    run_quench_photochem_model(**TOI270d())
+    run_quench_photochem_model(**nominal_S())
