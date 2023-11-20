@@ -14,7 +14,7 @@ warnings.filterwarnings('ignore')
 
 def compute_spectra(add_water_cloud, add_haze, outfile):
     filename_db = os.path.join(os.getenv('picaso_refdata'), 'opacities','all_opacities_0.6_6_R60000.db')
-    opa = jdi.opannection(filename_db=filename_db,wave_range=[1,6])
+    opa = jdi.opannection(filename_db=filename_db,wave_range=[0.01,100])
     opa = jdi.opannection(wave_range=[.01,100],filename_db=filename_db)
     case1 = jdi.inputs()
     case1.phase_angle(0)
