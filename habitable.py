@@ -60,8 +60,66 @@ def run_model(outfile, T_surf, mix, vdep, eddy, T_trop, relative_humidity):
     dz = p.pc.var.z[1] - p.pc.var.z[0]
     haze_column = haze_density*dz
     pressure = p.pc.wrk.pressure
-    haze_file = outfile+'_haze.txt'
-    utils.make_haze_opacity_file(pressure[:-1], haze_column[:-1], haze_file)
+    haze_file = outfile+'_clouds.txt'
+    make_cloud_file(p.pc, p.P_trop, haze_file)
+
+def make_cloud_file(pc, P_trop, outfile):
+
+    particle_radius = {}
+    col = {}
+
+    # water cloud
+    particle_radius['H2O'] = 10 # microns
+    log10P_cloud_thickness = np.log10(pc.var.surface_pressure*1e6) - np.log10(P_trop) # water cloud thickness
+
+    # Super rough based on Earth's troposphere
+    # 100 particles/cm^3 over 10 km troposphere
+    cloud_column_per_log10P = 100*10e5 # (particles/cm^2) / log10 pressure unit
+
+    # total H2O cloud column in particles/cm^2
+    tot_col_H2O_cloud = cloud_column_per_log10P*log10P_cloud_thickness
+
+    trop_ind = np.argmin(np.abs(P_trop - pc.wrk.pressure))
+
+    # particles/cm^3
+    density_H2O_cloud = tot_col_H2O_cloud/(pc.var.z[trop_ind] - pc.var.z[0])
+
+    dz = pc.var.z[1] - pc.var.z[0]
+    col_H2O = np.ones(pc.wrk.pressure.shape[0])*1e-100
+    col_H2O[:trop_ind] = density_H2O_cloud*dz
+
+    assert np.isclose(np.sum(col_H2O),tot_col_H2O_cloud)
+
+    col['H2O'] = col_H2O
+
+    # HC cloud
+    particle_radius['HC'] = 0.1 # microns
+    ind = pc.dat.species_names.index('HCaer1')
+    haze_density = pc.wrk.densities[ind,:]
+    ind = pc.dat.species_names.index('HCaer2')
+    haze_density += pc.wrk.densities[ind,:]
+    ind = pc.dat.species_names.index('HCaer3')
+    haze_density += pc.wrk.densities[ind,:]
+    dz = pc.var.z[1] - pc.var.z[0]
+    col_HC = haze_density*dz
+    col['HC'] = col_HC
+
+    # S2 and S8
+    particle_radius['S'] = 0.1 # microns
+    # ind = pc.dat.species_names.index('S2aer')
+    # haze_density = pc.wrk.densities[ind,:]
+    # ind = pc.dat.species_names.index('S8aer')
+    # haze_density += pc.wrk.densities[ind,:]
+    # col_S = haze_density*dz
+    col['S'] = np.ones(pc.wrk.pressure.shape[0])*1e-100
+
+    pressure = pc.wrk.pressure
+    # remove last
+    pressure = pressure[:-1].copy()
+    for key in col:
+        col[key] = col[key][:-1].copy()
+    
+    utils.make_haze_opacity_file(pressure, col, particle_radius, outfile)
 
 def default_params():
     params = {}

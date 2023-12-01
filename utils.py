@@ -3,6 +3,7 @@ from scipy import constants as const
 import miepython
 from photochem.clima import rebin
 import numba as nb
+import pickle
 
 @nb.cfunc(nb.double(nb.double, nb.double, nb.double))
 def custom_binary_diffusion_fcn(mu_i, mubar, T):
@@ -55,6 +56,21 @@ def eddy_profile_like_Jupiter(log10P):
     eddy[ind+2:] = log10P[ind+2:]*slope + intercept
 
     return 10.0**eddy
+
+def simple_eddy_diffusion_profile(log10P, log10P_trop, Kzz_trop):
+    """Simple eddy diffusion profile with a constant troposphere Kzz
+    connected to a Kzz that increases above the tropopause as P^-0.5
+    as roughly suggested by breaking gravity waves.
+    """
+    eddy = np.zeros(log10P.shape[0])
+
+    ind = np.argmin(np.abs(log10P - log10P_trop))
+    eddy[:ind+1] = np.log10(Kzz_trop)
+
+    intercept = np.log10(Kzz_trop) + 0.5*log10P[ind]
+    eddy[ind+1:] = intercept - 0.5*log10P[ind+1:]
+    eddy = 10.0**eddy
+    return eddy
 
 def composition_from_metalicity(M_H_metalicity):
 
@@ -167,7 +183,7 @@ def rebin_picaso_to_data(wv, flux, wv_bins_data):
         flux_vals_new[i] = rebin(wv_bins, flux_vals, wv_bins_data[i,:].copy())[0]
     return wv_bins, flux_vals, flux_vals_new
 
-def make_haze_opacity_file(pressure, haze_column, outfile):
+def make_haze_opacity_file_OLD(pressure, haze_column, outfile):
 
     particle_radius_um = 0.1 # microns
     particle_radius_cm = particle_radius_um*(1/1e6)*(1e2/1) # cm 
@@ -210,6 +226,81 @@ def make_haze_opacity_file(pressure, haze_column, outfile):
             out['w0'].append(w0[i])
             out['g0'].append(g[i])
 
+    fmt = '{:20}'
+    with open(outfile,'w') as f:
+        for key in out:
+            f.write(fmt.format(key))
+        f.write('\n')
+        for i in range(len(out['pressure'])):
+            for key in out:
+                f.write(fmt.format('%e'%(out[key][i])))
+            f.write('\n')
+
+def make_haze_opacity_file(pressure, cols, particle_radius, outfile):
+    # pressure in dynes/cm^2
+    # cols in particles/cm^2
+    # particle_radius in microns
+    
+    for key in ['S','HC','H2O']:
+        assert key in cols
+        assert key in particle_radius
+
+    assert len(cols['S']) == len(pressure)
+    assert len(cols['HC']) == len(pressure)
+    assert len(cols['H2O']) == len(pressure)
+
+    # Convert
+    particle_radius_cm = {}
+    for key in particle_radius:
+        particle_radius_cm[key] = particle_radius[key]*(1/1e6)*(1e2/1) # convert from um to cm
+    
+    # Load all optical data
+    with open('data/aerosol_optical_props.pkl','rb') as f:
+        opt = pickle.load(f)
+    
+    # Compute optical properties with mie theory
+    mie = {}
+    for key in particle_radius:
+        x = 2 * np.pi * particle_radius[key] / opt['wv']
+        m = opt[key]['nr'] - 1j*opt[key]['ni']
+        qext, qsca, qback, g = miepython.mie(m, x)
+        w0 = qsca/qext
+    
+        mie[key] = {}
+        mie[key]['qext'] = qext
+        mie[key]['w0'] = w0
+        mie[key]['g'] = g
+    
+    # At each altitude and wavelength, compute the optical
+    # properties considering the particle density
+    keys = ['pressure','wavenumber','opd','w0','g0']
+    out = {}
+    for key in keys:
+        out[key] = []
+    
+    for j in range(pressure.shape[0]): # over altitude
+        for i in range(opt['wv'].shape[0]): # over wavelength
+            tausp_1 = {}
+            taup = 0.0
+            tausp = 0.0
+            for k,key in enumerate(mie):
+                taup_1 = mie[key]['qext'][i]*np.pi*particle_radius_cm[key]**2*cols[key][j]
+                taup += taup_1
+                tausp_1[key] = mie[key]['w0'][i]*taup_1
+                tausp += tausp_1[key]
+            gt = 0.0
+            for k,key in enumerate(mie):
+                gt += mie[key]['g'][i]*tausp_1[key]/(tausp)
+            gt = np.minimum(gt,0.99999999)
+            w0 = np.minimum(0.9999999,tausp/taup)
+                
+            out['pressure'].append(pressure[j]/1e6)
+            out['wavenumber'].append(1e4/opt['wv'][i])
+            out['opd'].append(taup)
+            out['w0'].append(w0)
+            out['g0'].append(gt)
+            
+    # Save the results
     fmt = '{:20}'
     with open(outfile,'w') as f:
         for key in out:

@@ -5,7 +5,7 @@ import cantera as ct
 from scipy import integrate
 import pickle
 
-from photochem import Atmosphere
+from photochem import Atmosphere, PhotoException
 from photochem.clima import AdiabatClimate
 import utils
 import planets
@@ -189,23 +189,43 @@ def P_T_from_file(filename, P_bottom, P_top):
 
     return P, T
 
-def integrate_quench_equilibrium(pc):
+def integrate_quench_equilibrium(pc, P, T, P_top):
     pc.var.verbose = 0
     pc.var.atol = 1e-25
     pc.var.rtol = 1e-5
     pc.initialize_stepper(pc.wrk.usol)
 
     usol_prev = pc.wrk.usol.copy()
-    while True: 
-        for i in range(500):
-            pc.step()
-        usol_new = pc.wrk.usol.copy()
-        inds = np.where(usol_new>1e-10)
-        rel_change = np.max(np.abs(usol_new[inds]/usol_prev[inds] - 1))
-        print('%e'%rel_change)
-        usol_prev = usol_new.copy()
-        if rel_change < 5e-3:
-            break
+    counter = 0
+    nerrors = 0
+    try:
+        while True: 
+            try:
+                for i in range(500):
+                    pc.step()
+            except PhotoException as e:
+                usol = np.clip(pc.wrk.usol,a_min=1.0e-40,a_max=np.inf)
+                pc.initialize_stepper(usol)
+                if nerrors > 10:
+                    raise PhotoException(e)
+                nerrors += 1
+            
+            usol_new = pc.wrk.usol.copy()
+            inds = np.where(usol_new>1e-10)
+            rel_change = np.max(np.abs(usol_new[inds]/usol_prev[inds] - 1))
+            print('%.2e  %i'%(rel_change, counter))
+            usol_prev = usol_new.copy()
+            if rel_change < 1e-3:
+                break
+            if counter > 20:
+                pc.update_vertical_grid(TOA_pressure=P_top)
+                pc.set_press_temp_edd(P.copy(), T.copy(), (np.ones(T.shape[0])*pc.var.edd[0]).copy())
+                pc.initialize_stepper(pc.wrk.usol)
+                counter = 0
+            counter += 1
+    except KeyboardInterrupt:
+        # Manually stop integration, if desired.
+        pass
 
 def make_clima_profile_from_quench(c, pc, T_trop, P_top):
     
@@ -269,10 +289,11 @@ def make_picaso_input_neptune(outfile):
                     outfile+'_settings_quench.yaml',\
                     "input/k2_18b_stellar_flux.txt",\
                     outfile+'_atmosphere_quench_c.txt')
-    pc2 = Atmosphere('input/zahnle_earth_new.yaml',\
+    pc2 = Atmosphere('input/zahnle_earth_new_S8.yaml',\
                     outfile+'_settings_photochem.yaml',\
                     "input/k2_18b_stellar_flux.txt",\
-                    outfile+'_atmosphere_photochem_c.txt')
+                    outfile+'_atmosphere_photochem_c.txt',
+                    data_dir='/Users/nicholas/Documents/Research_local/PhotochemPy/photochem_clima_data')
     
     mix = {}
     mix['press'] = np.append(pc1.wrk.pressure,pc2.wrk.pressure)
@@ -307,10 +328,17 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
                     "input/k2_18b_stellar_flux.txt",\
                     atmosphere_quench_out)
     pc_q.var.custom_binary_diffusion_fcn = utils.custom_binary_diffusion_fcn
-    integrate_quench_equilibrium(pc_q)
+    integrate_quench_equilibrium(pc_q, P, T, P_top)
 
     atmosphere_out_c = outfile+"_atmosphere_quench_c.txt"
     pc_q.out2atmosphere_txt(atmosphere_out_c, overwrite=True)
+
+    with open(settings_quench_out,'r') as f:
+        settings = yaml.load(f,Loader=Loader)
+    settings['atmosphere-grid']['top'] = float(pc_q.var.top_atmos)
+    settings = FormatSettings_main(settings)
+    with open(settings_quench_out,'w') as f:
+        yaml.dump(settings, f, Dumper=MyDumper ,sort_keys=False, width=70)
 
     c = AdiabatClimate('input/neptune/species_quench_climate.yaml',
                        'input/neptune/settings_quench_climate.yaml',
@@ -323,29 +351,88 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
     sp_to_exclude = ['H2']
     write_photochem_settings_file(settings_photochem_in, settings_photochem_out, surf, min_mix_photochem, sp_to_exclude, c.z[-1], c.P_surf, P_condense, P_trop)
 
-    eddy_ = np.ones(c.z.shape[0])*eddy_p
+    log10P_trop = np.log10(c.P_trop/1e6)
+    log10P = np.log10(c.P/1e6)
+    Kzz_trop = eddy_p
+    eddy_ = utils.simple_eddy_diffusion_profile(log10P, log10P_trop, Kzz_trop)
     c.out2atmosphere_txt(atmosphere_photochem_out, eddy_, overwrite=True)
 
-    pc = Atmosphere('input/zahnle_earth_new.yaml',\
+    pc = Atmosphere('input/zahnle_earth_new_S8.yaml',\
                     settings_photochem_out,\
                     "input/k2_18b_stellar_flux.txt",\
-                    atmosphere_photochem_out)
+                    atmosphere_photochem_out,
+                    data_dir='/Users/nicholas/Documents/Research_local/PhotochemPy/photochem_clima_data')
     pc.var.custom_binary_diffusion_fcn = utils.custom_binary_diffusion_fcn
     pc.var.equilibrium_time = equilibrium_time
     pc.var.atol = 1e-25
     pc.var.rtol = 1e-3
     pc.initialize_stepper(pc.wrk.usol)
     tn = 0.0
-    while tn < pc.var.equilibrium_time:
-        tn = pc.step()
+    counter = 0
+    try:
+        while tn < pc.var.equilibrium_time:
+            tn = pc.step()
+            counter += 1
+            if counter > 3000:
+                pc.update_vertical_grid(TOA_pressure=1e-8*1e6)
+                pc.set_press_temp_edd(c.P, c.T, eddy_, c.P_trop)
+                pc.initialize_stepper(pc.wrk.usol)
+                counter = 0
+    except KeyboardInterrupt:
+        # Manually stop integration, if desired.
+        pass
 
+    # save result
     atmosphere_out_c = outfile+"_atmosphere_photochem_c.txt"
     pc.out2atmosphere_txt(atmosphere_out_c,overwrite=True)
+
+    # Alter settings file with updated TOA
+    with open(settings_photochem_out,'r') as f:
+        settings = yaml.load(f,Loader=Loader)
+    settings['atmosphere-grid']['top'] = float(pc.var.top_atmos)
+    settings = FormatSettings_main(settings)
+    with open(settings_photochem_out,'w') as f:
+        yaml.dump(settings, f, Dumper=MyDumper ,sort_keys=False, width=70)
 
     # write picaso file
     make_picaso_input_neptune(outfile)
 
-    # Haze column density (particles/cm^2)
+    # make file for clouds
+    haze_file = outfile+'_clouds.txt'
+    make_cloud_file(pc, pc_q, P_trop, P_condense, haze_file)
+    
+def make_cloud_file(pc, pc_q, P_trop, P_condense, outfile):
+
+    particle_radius = {}
+    col = {}
+
+    # water cloud
+    particle_radius['H2O'] = 10 # microns
+    log10P_cloud_thickness = np.log10(P_condense) - np.log10(P_trop) # water cloud thickness
+
+    # Super rough based on Earth's troposphere
+    # 100 particles/cm^3 over 10 km troposphere
+    cloud_column_per_log10P = 100*10e5 # (particles/cm^2) / log10 pressure unit
+
+    # total H2O cloud column in particles/cm^2
+    tot_col_H2O_cloud = cloud_column_per_log10P*log10P_cloud_thickness
+
+    trop_ind = np.argmin(np.abs(P_trop - pc.wrk.pressure))
+    condense_ind = np.argmin(np.abs(P_condense - pc.wrk.pressure))
+
+    # particles/cm^3
+    density_H2O_cloud = tot_col_H2O_cloud/(pc.var.z[trop_ind] - pc.var.z[condense_ind])
+
+    dz = pc.var.z[1] - pc.var.z[0]
+    col_H2O = np.ones(pc.wrk.pressure.shape[0])*1e-100
+    col_H2O[condense_ind:trop_ind] = density_H2O_cloud*dz
+
+    assert np.isclose(np.sum(col_H2O),tot_col_H2O_cloud)
+
+    col['H2O'] = col_H2O
+
+    # HC cloud
+    particle_radius['HC'] = 0.1 # microns
     ind = pc.dat.species_names.index('HCaer1')
     haze_density = pc.wrk.densities[ind,:]
     ind = pc.dat.species_names.index('HCaer2')
@@ -353,14 +440,30 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
     ind = pc.dat.species_names.index('HCaer3')
     haze_density += pc.wrk.densities[ind,:]
     dz = pc.var.z[1] - pc.var.z[0]
-    haze_column = haze_density*dz
+    col_HC = haze_density*dz
+    col['HC'] = col_HC
+
+    # S2 and S8
+    particle_radius['S'] = 0.1 # microns
+    ind = pc.dat.species_names.index('S2aer')
+    haze_density = pc.wrk.densities[ind,:]
+    ind = pc.dat.species_names.index('S8aer')
+    haze_density += pc.wrk.densities[ind,:]
+    col_S = haze_density*dz
+    col['S'] = col_S
+
     pressure = pc.wrk.pressure
     # Append values for lower atmosphere
     pressure = np.append(pc_q.wrk.pressure,pressure)
-    haze_column = np.append(np.zeros(pc_q.wrk.pressure.shape[0]),haze_column)
-    # write file
-    haze_file = outfile+'_haze.txt'
-    utils.make_haze_opacity_file(pressure[:-1], haze_column[:-1], haze_file)
+    for key in col:
+        col[key] = np.append(np.ones(pc_q.wrk.pressure.shape[0])*1e-100,col[key])
+
+    # remove last
+    pressure = pressure[:-1].copy()
+    for key in col:
+        col[key] = col[key][:-1].copy()
+    
+    utils.make_haze_opacity_file(pressure, col, particle_radius, outfile)
 
 def default_params():
     params = {}
@@ -383,18 +486,29 @@ def default_params():
     params['equilibrium_time'] = 1e17
     return params
 
-def nominal():
-    params = default_params()
-    params['outfile'] = 'results/neptune/nominal'
-    params['equilibrium_time'] = 2e13
-    return params
-
 def nominal_S():
     params = default_params()
     params['outfile'] = 'results/neptune/nominal_S'
     params['atoms'] = ['H','He','C','O','N','S']
     params['equilibrium_time'] = 1.0e10
+    params['eddy_p'] = 1e3
+    return params
+
+def nominal_S_Kzz4():
+    params = default_params()
+    params['outfile'] = 'results/neptune/nominal_S_Kzz4'
+    params['atoms'] = ['H','He','C','O','N','S']
+    params['equilibrium_time'] = 1.0e10
+    params['eddy_p'] = 1e4
+    return params
+
+def nominal_S_Kzz5():
+    params = default_params()
+    params['outfile'] = 'results/neptune/nominal_S_Kzz5'
+    params['atoms'] = ['H','He','C','O','N','S']
+    params['equilibrium_time'] = 1.0e10
+    params['eddy_p'] = 1e5
     return params
 
 if __name__ == '__main__':
-    run_quench_photochem_model(**nominal_S())
+    run_quench_photochem_model(**nominal_S_Kzz5())
