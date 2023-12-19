@@ -19,8 +19,10 @@ class PhotochemClima():
         self.bg_gas = self.pc.dat.species_names[-3] # background gas name
         self.relative_humidity = 1.0 # default relative humidity
         self.constant_eddy = 1.0e5 # default eddy diffusion
+        self.altitude_dependent_eddy = False
         # Tolerance for P-T profile
         self.T_tol = 1.0 # K
+        self.edd_tol = 0.1 # 0.1 log unit
         self.max_dT = 0.0
 
         # Tolerance for TOA pressure
@@ -54,7 +56,7 @@ class PhotochemClima():
         P_surf = self.pc.var.surface_pressure*1.0e6
         P_i = f_i*P_surf
         self.c.RH = np.ones(len(self.c.species_names))*self.relative_humidity
-        self.c.P_top = self.avg_TOA_p
+        self.c.P_top = self.min_TOA_p
         self.c.make_profile_bg_gas(T_surf, P_i, P_surf, self.bg_gas)
 
         # Update photochem vertical grid to match clima
@@ -71,10 +73,17 @@ class PhotochemClima():
         # Set P-T-edd profile
         self.P = np.append(self.c.P_surf + self.c.P_surf*1e-12, self.c.P)
         self.T = np.append(self.c.T_surf, self.c.T)
-        self.edd = np.ones(self.P.shape[0])*self.constant_eddy
+        if self.altitude_dependent_eddy:
+            log10P = np.log10(self.P/1e6)
+            log10P_trop = np.log10(self.c.P_trop/1e6)
+            self.edd = utils.simple_eddy_diffusion_profile(log10P, log10P_trop, self.constant_eddy)
+            self.edd[self.edd >= 1e6] = 1e6
+        else:
+            self.edd = np.ones(self.P.shape[0])*self.constant_eddy
         self.P_trop = self.c.P_trop
         self.log10P_interp = np.log10(self.P.copy()[::-1])
         self.T_interp = self.T.copy()[::-1]
+        self.log10edd_interp = np.log10(self.edd.copy()[::-1])
         self.pc.set_press_temp_edd(self.P, self.T, self.edd, self.P_trop)
 
         # relative humidity
@@ -93,6 +102,15 @@ class PhotochemClima():
         self.max_dT = np.max(np.abs(T_p - self.pc.var.temperature))
         if self.max_dT > self.T_tol:
             # If not in tolerance, then re-set the the T-P profile
+            self.pc.set_press_temp_edd(self.P, self.T, self.edd, self.P_trop)
+            self.pc.initialize_stepper(self.pc.wrk.usol.copy())
+            tn = 0.0
+
+        # Check that P-edd profile is within tolerance
+        log10edd_p = np.interp(np.log10(self.pc.wrk.pressure.copy()[::-1]), self.log10P_interp, self.log10edd_interp)
+        log10edd_p = log10edd_p.copy()[::-1]
+        self.max_dedd = np.max(np.abs(log10edd_p - np.log10(self.pc.var.edd)))
+        if self.max_dedd > self.edd_tol:
             self.pc.set_press_temp_edd(self.P, self.T, self.edd, self.P_trop)
             self.pc.initialize_stepper(self.pc.wrk.usol.copy())
             tn = 0.0
