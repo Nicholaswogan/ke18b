@@ -288,7 +288,8 @@ def make_picaso_input_neptune(outfile):
     pc1 = Atmosphere('input/zahnle_earth_new_noparticles.yaml',\
                     outfile+'_settings_quench.yaml',\
                     "input/k2_18b_stellar_flux.txt",\
-                    outfile+'_atmosphere_quench_c.txt')
+                    outfile+'_atmosphere_quench_c.txt',
+                    data_dir='/Users/nicholas/Documents/Research_local/PhotochemPy/photochem_clima_data')
     pc2 = Atmosphere('input/zahnle_earth_new_S8.yaml',\
                     outfile+'_settings_photochem.yaml',\
                     "input/k2_18b_stellar_flux.txt",\
@@ -326,7 +327,8 @@ def run_quench_photochem_model(settings_quench_in, settings_photochem_in, PTfile
     pc_q = Atmosphere('input/zahnle_earth_new_noparticles.yaml',\
                     settings_quench_out,\
                     "input/k2_18b_stellar_flux.txt",\
-                    atmosphere_quench_out)
+                    atmosphere_quench_out,
+                    data_dir='/Users/nicholas/Documents/Research_local/PhotochemPy/photochem_clima_data')
     pc_q.var.custom_binary_diffusion_fcn = utils.custom_binary_diffusion_fcn
     integrate_quench_equilibrium(pc_q, P, T, P_top)
 
@@ -511,4 +513,4 @@ def nominal_S_Kzz5():
     return params
 
 if __name__ == '__main__':
-    run_quench_photochem_model(**nominal_S_Kzz5())
+    run_quench_photochem_model(**nominal_S())

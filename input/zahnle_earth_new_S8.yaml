@@ -2425,6 +2425,12 @@ reactions:
   rate-constant: {A: 2.8e-11, b: 0.0, Ea: 250}
 - equation: H2O + hv => OH + H
   type: photolysis
+- equation: H2O + hv => H2 + O1D
+  type: photolysis
+- equation: H2O + hv => O + H + H
+  type: photolysis
+- equation: H2 + hv => H + H
+  type: photolysis
 - equation: CO2 + hv => CO + O
   type: photolysis
 - equation: CO2 + hv => CO + O1D

@@ -17,15 +17,20 @@ def make_picaso_input_habitable(p, outfile):
     species = pc.dat.species_names[pc.dat.np:-2]
     utils.write_picaso_atmosphere(mix, outfile+'_picaso.pt', species)
 
-def run_model(outfile, T_surf, mix, vdep, eddy, T_trop, relative_humidity):
+def run_model(outfile, T_surf, mix, vdep, eddy, T_trop, relative_humidity,equilibrium_time,atol,atol_min,atol_max):
 
     p = PhotochemClima('input/zahnle_earth_new.yaml',
                    'input/habitable/settings_habitable_template.yaml',
                    'input/k2_18b_stellar_flux.txt',
                    'input/habitable/atmosphere_init.txt',
                    'input/habitable/species_climate.yaml',
-                   'input/habitable/settings_climate_scale=0.7.yaml')
+                   'input/habitable/settings_climate_scale=0.7.yaml',
+                   data_dir='/Users/nicholas/Documents/Research_local/PhotochemPy/photochem_clima_data')
     p.pc.var.verbose = 1
+    p.pc.var.equilibrium_time=equilibrium_time
+    p.pc.var.atol=atol
+    p.atol_min = atol_min
+    p.atol_max = atol_max
 
     # Other variables
     p.constant_eddy = eddy
@@ -130,6 +135,10 @@ def default_params():
     params['eddy'] = 5.0e5
     params['T_trop'] = 215.0
     params['relative_humidity'] = 1.0
+    params['equilibrium_time'] = 1.0e17
+    params['atol'] = 1.0e-27
+    params['atol_min'] = 1.0e-29
+    params['atol_max'] = 1.0e-26
     return params
 
 def model1a():
@@ -137,13 +146,17 @@ def model1a():
     params['outfile'] = 'results/habitable/model1a'
     params['mix'] = {'H2O': 200.0, 'CO2': 0.008, 'N2': 3.0e-3}
     params['eddy'] = 5.0e5
+    params['equilibrium_time'] = 1.0e14
+    params['atol'] = 1.0e-24
+    params['atol_min'] = 1.0e-25
+    params['atol_max'] = 1.0e-24
     return params
 
 def model1b():
     params = default_params()
     params['outfile'] = 'results/habitable/model1b'
     params['mix'] = {'H2O': 200.0, 'CO2': 0.008, 'N2': 1.0e-6}
-    params['eddy'] = 2.0e4
+    params['eddy'] = 1.0e4
     return params
 
 def model1c():
